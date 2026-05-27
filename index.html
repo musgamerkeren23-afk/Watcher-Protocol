@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Watcher Protocol V5 FINAL</title>
+<title>Watcher Protocol V7 FINAL</title>
 
 <style>
 body { margin:0; overflow:hidden; background:black; font-family:Arial; }
@@ -19,22 +19,10 @@ button {
   background:#900;
   color:white;
   border:none;
-  font-size:12px;
 }
 
-#top {
-  position:absolute;
-  top:10px;
-  left:10px;
-  color:white;
-}
-
-#power {
-  position:absolute;
-  top:10px;
-  right:10px;
-  color:red;
-}
+#top { position:absolute; top:10px; left:10px; color:white; }
+#power { position:absolute; top:10px; right:10px; color:red; }
 
 #camUI {
   position:absolute;
@@ -43,18 +31,6 @@ button {
   transform:translateX(-50%);
   display:none;
 }
-
-#jumpscare {
-  position:absolute;
-  width:100%;
-  height:100%;
-  background:black;
-  color:red;
-  font-size:40px;
-  display:none;
-  justify-content:center;
-  align-items:center;
-}
 </style>
 </head>
 
@@ -62,8 +38,6 @@ button {
 
 <div id="top">Night 1</div>
 <div id="power">Power: 100%</div>
-
-<div id="jumpscare">💀</div>
 
 <div id="camUI">
   <button onclick="viewCam('hall')">HALL</button>
@@ -96,24 +70,47 @@ document.body.appendChild(renderer.domElement);
 
 scene.add(new THREE.AmbientLight(0x404040));
 
-// MAP
-const camPos = {
-  office:[0,2,3],
-  hall:[10,2,3],
-  vent:[-10,2,3],
-  stage:[0,2,-15]
-};
-
-// ROOM
-function room(x,z){
-  const r=new THREE.Mesh(
-    new THREE.BoxGeometry(8,5,8),
-    new THREE.MeshBasicMaterial({color:0x111111,side:THREE.BackSide})
+// ROOM FUNCTION (CLEAR VISUAL)
+function room(x,z,color){
+  const r = new THREE.Mesh(
+    new THREE.BoxGeometry(10,5,10),
+    new THREE.MeshStandardMaterial({
+      color,
+      roughness:0.8,
+      metalness:0.2,
+      side:THREE.BackSide
+    })
   );
   r.position.set(x,2,z);
   scene.add(r);
+
+  // BIG OBJECT (biar keliatan)
+  const box = new THREE.Mesh(
+    new THREE.BoxGeometry(2,2,2),
+    new THREE.MeshStandardMaterial({color:0xffffff})
+  );
+  box.position.set(x,1,z);
+  scene.add(box);
+
+  // LIGHT
+  const light = new THREE.PointLight(0xffffff,1,15);
+  light.position.set(x,3,z);
+  scene.add(light);
 }
-room(0,0); room(10,0); room(-10,0); room(0,-20);
+
+// MAP
+room(0,0,0x111111);     // office
+room(10,0,0x2222ff);    // hall
+room(-10,0,0x22ff22);   // vent
+room(0,-20,0xff2222);   // stage
+
+// CAMERA POS + TARGET
+const camData = {
+  office:{pos:[0,2,5], look:[0,1,0]},
+  hall:{pos:[10,2,5], look:[10,1,0]},
+  vent:{pos:[-10,2,5], look:[-10,1,0]},
+  stage:{pos:[0,2,-10], look:[0,1,-20]}
+};
 
 // DOOR
 function makeDoor(x){
@@ -127,10 +124,9 @@ function makeDoor(x){
 }
 const leftDoor=makeDoor(-3);
 const rightDoor=makeDoor(3);
-
 let door={left:false,right:false};
 
-// LIGHT
+// LIGHT DOOR
 function makeLight(x){
   const l=new THREE.PointLight(0xffffaa,0,5);
   l.position.set(x,2,-3);
@@ -140,36 +136,31 @@ function makeLight(x){
 const leftLight=makeLight(-3);
 const rightLight=makeLight(3);
 
-// MONSTER
+// MONSTER (BIAR KELIATAN)
 function monster(color){
   const m=new THREE.Mesh(
-    new THREE.BoxGeometry(1,1,1),
-    new THREE.MeshBasicMaterial({color})
+    new THREE.BoxGeometry(1.5,1.5,1.5),
+    new THREE.MeshStandardMaterial({color})
   );
   scene.add(m);
   return m;
 }
-const watcher=monster(0xffffff);
-const crawler=monster(0xff0000);
 
-// SPAWN
-function resetM(m){ m.position.set(0,0.5,-18); }
-resetM(watcher); resetM(crawler);
+const watcher=monster(0xffffff);
+watcher.position.set(0,0.75,-18);
 
 // STATE
-let camOpen=false;
 let cam="office";
-let power=100;
-let safe=600;
-let tick=0;
+let camOpen=false;
 
-// CAMERA
+// CAMERA UPDATE
 function updateCam(){
-  let p=camPos[cam];
-  camera.position.set(p[0],p[1],p[2]);
+  let d=camData[cam];
+  camera.position.set(...d.pos);
+  camera.lookAt(...d.look);
 }
 
-// LOOK
+// LOOK OFFICE
 function lookLeft(){ if(camOpen)return; camera.rotation.y=0.8; }
 function lookCenter(){ if(camOpen)return; camera.rotation.y=0; }
 function lookRight(){ if(camOpen)return; camera.rotation.y=-0.8; }
@@ -196,52 +187,18 @@ function toggleCam(){
 }
 function viewCam(n){ cam=n; }
 
-// JUMPSCARE
-function jumpscare(){
-  jumpscareDiv.style.display="flex";
-  setTimeout(()=>location.reload(),2000);
-}
-
 // LOOP
+let tick=0;
 function animate(){
 requestAnimationFrame(animate);
 tick++;
 
 updateCam();
 
-// SAFE
-if(safe>0){ safe--; }
-
-// POWER
-power -= door.left||door.right ? 0.02:0.01;
-power -= camOpen ? 0.02:0;
-
-if(power<=0) jumpscare();
-
-// WATCHER (pelan)
-if(safe<=0 && tick%120===0){
-  watcher.position.z+=2;
+// MONSTER GERAK BIAR KELIATAN
+if(tick%120===0){
+  watcher.position.z += 2;
 }
-
-// CRAWLER (cepat)
-if(safe<=0 && tick%80===0){
-  crawler.position.z+=3;
-}
-
-// CHECK
-[watcher,crawler].forEach(m=>{
-  if(m.position.z>-2){
-    if(!door.left && !door.right){
-      jumpscare();
-    } else {
-      resetM(m);
-    }
-  }
-});
-
-// UI
-top.innerText = safe>0 ? "GET READY..." : "Night 1";
-powerText.innerText="Power: "+Math.floor(power)+"%";
 
 renderer.render(scene,camera);
 }
