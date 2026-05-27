@@ -1,11 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Watcher Protocol V10 FINAL</title>
+<title>Watcher Protocol V11 FINAL</title>
 
 <style>
-body { margin:0; overflow:hidden; background:black; font-family:Arial; }
+body {
+  margin:0;
+  overflow:hidden;
+  background:black;
 
+  /* 🔥 BLOCK SELECT */
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+/* UI */
 #ui {
   position:absolute;
   bottom:5px;
@@ -20,10 +29,25 @@ button {
   color:white;
   border:none;
 }
+
+/* 💀 JUMPSCARE */
+#death {
+  position:absolute;
+  width:100%;
+  height:100%;
+  background:black;
+  color:red;
+  font-size:50px;
+  display:none;
+  justify-content:center;
+  align-items:center;
+}
 </style>
 </head>
 
 <body>
+
+<div id="death">💀 YOU DIED</div>
 
 <div id="ui">
   <button onclick="lookLeft()">LEFT</button>
@@ -34,74 +58,42 @@ button {
   <button onclick="lightDoor('left')">LEFT LIGHT</button>
   <button onclick="toggleDoor('right')">RIGHT DOOR</button>
   <button onclick="lightDoor('right')">RIGHT LIGHT</button>
-  <br>
-  <button onclick="toggleCam()">CAM</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
 
 <script>
+// BLOCK RIGHT CLICK
+document.addEventListener("contextmenu", e=>e.preventDefault());
+
 // ===== BASIC =====
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x000000);
 scene.fog = new THREE.Fog(0x000000, 10, 100);
 
-// CAMERA (FIX)
 const camera = new THREE.PerspectiveCamera(90, innerWidth/innerHeight, 0.1, 2000);
 
-// RENDERER (SUPER IMPORTANT FIX)
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
-renderer.physicallyCorrectLights = true;
-renderer.outputEncoding = THREE.sRGBEncoding;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.5;
 document.body.appendChild(renderer.domElement);
 
-// GLOBAL LIGHT (BIAR GAK HITAM)
-scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.8));
+// LIGHT
+scene.add(new THREE.AmbientLight(0xffffff,0.7));
 
-// ===== ROOM CREATOR =====
-function createRoom(x,z,color){
-  const g = new THREE.Group();
+// ===== ROOM =====
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(20,20),
+  new THREE.MeshStandardMaterial({color:0x111111})
+);
+floor.rotation.x = -Math.PI/2;
+scene.add(floor);
 
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(20,20),
-    new THREE.MeshStandardMaterial({color})
-  );
-  floor.rotation.x = -Math.PI/2;
-  g.add(floor);
-
-  const wallMat = new THREE.MeshStandardMaterial({color:0x333333});
-
-  const back = new THREE.Mesh(new THREE.BoxGeometry(20,10,0.5), wallMat);
-  back.position.set(0,5,-10);
-  g.add(back);
-
-  const left = new THREE.Mesh(new THREE.BoxGeometry(0.5,10,20), wallMat);
-  left.position.set(-10,5,0);
-
-  const right = left.clone();
-  right.position.x = 10;
-
-  g.add(left,right);
-
-  // STRONG LIGHT
-  const light = new THREE.PointLight(0xffffff,5,50);
-  light.position.set(0,8,0);
-  g.add(light);
-
-  g.position.set(x,0,z);
-  scene.add(g);
-}
-
-// ===== MAP =====
-createRoom(0,0,0x111111);     // office
-createRoom(0,-30,0x552222);   // stage
-createRoom(-30,0,0x225522);   // vent
-createRoom(30,0,0x222255);    // hall2
-createRoom(0,30,0x444444);    // hall1
+const wall = new THREE.Mesh(
+  new THREE.BoxGeometry(20,10,0.5),
+  new THREE.MeshStandardMaterial({color:0x333333})
+);
+wall.position.set(0,5,-10);
+scene.add(wall);
 
 // ===== DOOR =====
 function makeDoor(x){
@@ -125,7 +117,7 @@ function toggleDoor(side){
   d.position.y = door[side]?1:2.5;
 }
 
-// ===== FLASHLIGHT =====
+// ===== LIGHT =====
 function lightDoor(side){
   const flash = new THREE.PointLight(0xffffaa,6,15);
   let x = side==="left"?-4:4;
@@ -135,84 +127,79 @@ function lightDoor(side){
   setTimeout(()=>scene.remove(flash),500);
 }
 
-// ===== CAMERA SYSTEM =====
-let cam="office";
-let camOpen=false;
+// ===== CAMERA =====
+camera.position.set(0,5,15);
 
-const camPos = {
-  office:[0,5,15],
-  stage:[0,10,-10],
-  hall1:[0,10,40],
-  hall2:[30,10,10],
-  vent:[-30,10,10]
-};
-
-function updateCam(){
-  let p = camPos[cam];
-  camera.position.set(...p);
-
-  if(cam==="office") camera.lookAt(0,0,0);
-  if(cam==="stage") camera.lookAt(0,0,-30);
-  if(cam==="hall1") camera.lookAt(0,0,30);
-  if(cam==="hall2") camera.lookAt(30,0,0);
-  if(cam==="vent") camera.lookAt(-30,0,0);
-}
-
-// LOOK
-function lookLeft(){ if(camOpen)return; camera.rotation.y=0.8; }
-function lookCenter(){ if(camOpen)return; camera.rotation.y=0; }
-function lookRight(){ if(camOpen)return; camera.rotation.y=-0.8; }
-
-// CAM
-function toggleCam(){
-  camOpen = !camOpen;
-  cam = camOpen ? "hall1" : "office";
-}
+function lookLeft(){ camera.rotation.y=0.8; }
+function lookCenter(){ camera.rotation.y=0; }
+function lookRight(){ camera.rotation.y=-0.8; }
 
 // ===== ANIMATRONIC =====
-function createAnim(){
-  const g = new THREE.Group();
+const monster = new THREE.Group();
 
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(2,3,1.5),
-    new THREE.MeshStandardMaterial({color:0x222222})
-  );
+const body = new THREE.Mesh(
+  new THREE.BoxGeometry(2,3,1.5),
+  new THREE.MeshStandardMaterial({color:0x222222})
+);
 
-  const head = new THREE.Mesh(
-    new THREE.BoxGeometry(1.5,1.5,1.5),
-    new THREE.MeshStandardMaterial({color:0x333333})
-  );
-  head.position.y = 2.2;
+const head = new THREE.Mesh(
+  new THREE.BoxGeometry(1.5,1.5,1.5),
+  new THREE.MeshStandardMaterial({color:0x333333})
+);
+head.position.y = 2.2;
 
-  const eye = new THREE.Mesh(
-    new THREE.SphereGeometry(0.2),
-    new THREE.MeshBasicMaterial({color:0xffffff})
-  );
-  eye.position.set(0.4,2.2,0.8);
+const eye = new THREE.Mesh(
+  new THREE.SphereGeometry(0.2),
+  new THREE.MeshBasicMaterial({color:0xffffff})
+);
+eye.position.set(0.4,2.2,0.8);
 
-  const eye2 = eye.clone();
-  eye2.position.x = -0.4;
+const eye2 = eye.clone();
+eye2.position.x = -0.4;
 
-  g.add(body,head,eye,eye2);
-  scene.add(g);
-  return g;
+monster.add(body,head,eye,eye2);
+scene.add(monster);
+
+monster.position.set(0,0,-20);
+
+// ===== JUMPSCARE =====
+function jumpscare(){
+  document.getElementById("death").style.display="flex";
+  setTimeout(()=>location.reload(),2000);
 }
-
-const monster = createAnim();
-monster.position.set(0,0,-25);
 
 // ===== AI =====
 let tick=0;
 
 function updateAI(){
-  if(tick%200===0){
-    monster.position.x = Math.random()>0.5? -4:4;
+
+  // maju pelan
+  if(monster.position.z < -5){
+    monster.position.z += 0.05;
   }
 
-  if(tick%120===0){
-    monster.position.z += 2;
+  // pilih sisi
+  if(monster.position.z < -10){
+    monster.position.x = Math.random()>0.5 ? -4 : 4;
   }
 
+  // stop di pintu
+  if(monster.position.z >= -5){
+    monster.position.z = -5;
+  }
+
+  let side = monster.position.x < 0 ? "left" : "right";
+
+  if(monster.position.z >= -5){
+
+    if(!door[side]){
+      jumpscare();
+    } else {
+      monster.position.z = -20; // mundur
+    }
+  }
+
+  // animasi
   monster.rotation.y += 0.01;
 }
 
@@ -221,8 +208,6 @@ function animate(){
 requestAnimationFrame(animate);
 
 tick++;
-
-updateCam();
 updateAI();
 
 renderer.render(scene,camera);
