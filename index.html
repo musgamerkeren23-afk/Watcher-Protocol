@@ -1,164 +1,142 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Watcher Protocol V8</title>
+<title>Watcher Protocol - MAP DETAIL</title>
 
 <style>
 body { margin:0; overflow:hidden; background:black; }
-
-#ui {
-  position:absolute;
-  bottom:5px;
-  width:100%;
-  text-align:center;
-}
-
-button {
-  padding:8px;
-  margin:3px;
-  background:#900;
-  color:white;
-  border:none;
-}
 </style>
 </head>
 
 <body>
 
-<div id="ui">
-  <button onclick="lookLeft()">LEFT</button>
-  <button onclick="lookCenter()">CENTER</button>
-  <button onclick="lookRight()">RIGHT</button>
-  <br>
-  <button onclick="toggleDoor('left')">LEFT DOOR</button>
-  <button onclick="lightDoor('left')">LEFT LIGHT</button>
-  <button onclick="toggleDoor('right')">RIGHT DOOR</button>
-  <button onclick="lightDoor('right')">RIGHT LIGHT</button>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
 
 <script>
-// BASIC
+// SCENE
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x000000,5,25);
+scene.fog = new THREE.Fog(0x000000, 10, 80);
 
-const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer();
+const camera = new THREE.PerspectiveCamera(90, innerWidth/innerHeight, 0.1, 2000);
+const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// LIGHT
+// LIGHT GLOBAL
 scene.add(new THREE.AmbientLight(0x222222));
 
-// ROOM
-const room = new THREE.Mesh(
-  new THREE.BoxGeometry(10,5,10),
-  new THREE.MeshStandardMaterial({color:0x111111, side:THREE.BackSide})
-);
-scene.add(room);
+// 🧱 ROOM CREATOR (DETAIL)
+function createRoom(x,z,color,name){
+  const g = new THREE.Group();
 
-// DOOR
-function makeDoor(x){
-  const d = new THREE.Mesh(
-    new THREE.BoxGeometry(1,3,0.2),
-    new THREE.MeshStandardMaterial({color:0x550000})
+  // FLOOR
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(20,20),
+    new THREE.MeshStandardMaterial({color})
   );
-  d.position.set(x,1.5,-4);
-  scene.add(d);
-  return d;
-}
-const leftDoor = makeDoor(-3);
-const rightDoor = makeDoor(3);
+  floor.rotation.x = -Math.PI/2;
+  g.add(floor);
 
-let door = {left:false,right:false};
-
-// 💡 FIXED SPOTLIGHT
-function makeSpot(x){
-  const s = new THREE.SpotLight(0xffffaa,0,10,Math.PI/6,0.5);
-  s.position.set(x,2,2);
-  s.target.position.set(x,1,-4);
-  scene.add(s.target);
-  scene.add(s);
-  return s;
-}
-
-const leftLight = makeSpot(-3);
-const rightLight = makeSpot(3);
-
-// 👹 CUSTOM ANIMATRONIC (beda dari FNAF)
-function createAnimatronic(){
-  const group = new THREE.Group();
-
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(1.2,1.5,0.8),
-    new THREE.MeshStandardMaterial({color:0x222222})
-  );
-
-  const head = new THREE.Mesh(
-    new THREE.BoxGeometry(1,1,1),
+  // WALL BACK
+  const back = new THREE.Mesh(
+    new THREE.BoxGeometry(20,10,0.5),
     new THREE.MeshStandardMaterial({color:0x333333})
   );
-  head.position.y = 1.2;
+  back.position.set(0,5,-10);
+  g.add(back);
 
-  const eyeL = new THREE.Mesh(
-    new THREE.SphereGeometry(0.1),
-    new THREE.MeshBasicMaterial({color:0xffffff})
+  // SIDE WALLS
+  const left = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5,10,20),
+    new THREE.MeshStandardMaterial({color:0x222222})
   );
-  eyeL.position.set(-0.2,1.2,0.5);
+  left.position.set(-10,5,0);
 
-  const eyeR = eyeL.clone();
-  eyeR.position.x = 0.2;
+  const right = left.clone();
+  right.position.x = 10;
 
-  group.add(body,head,eyeL,eyeR);
-  scene.add(group);
+  g.add(left,right);
 
-  return group;
-}
+  // LIGHT
+  const light = new THREE.PointLight(0xffffff,1.5,40);
+  light.position.set(0,8,0);
+  g.add(light);
 
-const anim = createAnimatronic();
-anim.position.set(-3,0,-6); // kiri pintu
-
-// CAMERA
-camera.position.set(0,2,3);
-
-// LOOK
-let camOpen=false;
-
-function lookLeft(){ if(camOpen)return; camera.rotation.y=0.8; }
-function lookCenter(){ if(camOpen)return; camera.rotation.y=0; }
-function lookRight(){ if(camOpen)return; camera.rotation.y=-0.8; }
-
-// DOOR
-function toggleDoor(side){
-  door[side] = !door[side];
-  let d = side=="left"?leftDoor:rightDoor;
-  d.position.y = door[side]?0.5:1.5;
-}
-
-// 💡 LIGHT SYSTEM FIX
-function lightDoor(side){
-  let light = side=="left"?leftLight:rightLight;
-
-  light.intensity = 3;
-
-  // REVEAL MONSTER
-  if(side=="left" && anim.position.x < 0){
-    anim.visible = true;
+  // DETAIL OBJECT (biar hidup)
+  for(let i=0;i<5;i++){
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(2,2,2),
+      new THREE.MeshStandardMaterial({color:0x555555})
+    );
+    box.position.set(
+      Math.random()*10-5,
+      1,
+      Math.random()*10-5
+    );
+    g.add(box);
   }
 
-  setTimeout(()=>{
-    light.intensity = 0;
-    anim.visible = false;
-  },1000);
+  g.position.set(x,0,z);
+  scene.add(g);
+}
+
+// 🗺️ MAP ROOMS
+createRoom(0,0,0x111111,"office");
+createRoom(0,-30,0x552222,"stage");
+createRoom(-30,0,0x225522,"vent");
+createRoom(30,0,0x222255,"hall2");
+createRoom(0,30,0x444444,"hall1");
+
+// 🎭 STAGE SPECIAL (lebih horror)
+const stageLight = new THREE.PointLight(0xff0000,3,50);
+stageLight.position.set(0,10,-30);
+scene.add(stageLight);
+
+// 👹 MONSTER (buat visual)
+const monster = new THREE.Mesh(
+  new THREE.BoxGeometry(2,3,1.5),
+  new THREE.MeshStandardMaterial({color:0x111111})
+);
+monster.position.set(0,1.5,-35);
+scene.add(monster);
+
+// CAMERA CONTROL (TEST VIEW)
+let mode = 0;
+
+document.addEventListener("click",()=>{
+  mode = (mode+1)%5;
+});
+
+// CAMERA UPDATE
+function updateCam(){
+  if(mode===0){
+    camera.position.set(0,10,20); // office
+    camera.lookAt(0,0,0);
+  }
+  if(mode===1){
+    camera.position.set(0,10,-10); // stage
+    camera.lookAt(0,0,-30);
+  }
+  if(mode===2){
+    camera.position.set(-30,10,10); // vent
+    camera.lookAt(-30,0,0);
+  }
+  if(mode===3){
+    camera.position.set(30,10,10); // hall2
+    camera.lookAt(30,0,0);
+  }
+  if(mode===4){
+    camera.position.set(0,10,40); // hall1
+    camera.lookAt(0,0,30);
+  }
 }
 
 // LOOP
 function animate(){
 requestAnimationFrame(animate);
 
-// idle animation (biar hidup)
-anim.rotation.y += 0.01;
+updateCam();
+monster.rotation.y += 0.01;
 
 renderer.render(scene,camera);
 }
