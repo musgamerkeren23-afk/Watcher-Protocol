@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Watcher Protocol V4</title>
+<title>Watcher Protocol V5 FINAL</title>
 
 <style>
 body { margin:0; overflow:hidden; background:black; font-family:Arial; }
@@ -15,14 +15,14 @@ body { margin:0; overflow:hidden; background:black; font-family:Arial; }
 
 button {
   padding:8px;
-  margin:2px;
+  margin:3px;
   background:#900;
   color:white;
   border:none;
-  font-size:11px;
+  font-size:12px;
 }
 
-#info {
+#top {
   position:absolute;
   top:10px;
   left:10px;
@@ -35,177 +35,216 @@ button {
   right:10px;
   color:red;
 }
+
+#camUI {
+  position:absolute;
+  top:40px;
+  left:50%;
+  transform:translateX(-50%);
+  display:none;
+}
+
+#jumpscare {
+  position:absolute;
+  width:100%;
+  height:100%;
+  background:black;
+  color:red;
+  font-size:40px;
+  display:none;
+  justify-content:center;
+  align-items:center;
+}
 </style>
 </head>
 
 <body>
 
-<div id="info">CAM: OFFICE | NIGHT 1</div>
-<div id="power">POWER: 100%</div>
+<div id="top">Night 1</div>
+<div id="power">Power: 100%</div>
+
+<div id="jumpscare">💀</div>
+
+<div id="camUI">
+  <button onclick="viewCam('hall')">HALL</button>
+  <button onclick="viewCam('vent')">VENT</button>
+  <button onclick="viewCam('stage')">STAGE</button>
+</div>
 
 <div id="ui">
-  <button onclick="switchCam('office')">OFFICE</button>
-  <button onclick="switchCam('hall')">HALL</button>
-  <button onclick="switchCam('vent')">VENT</button>
-  <button onclick="switchCam('power')">POWER</button>
-  <button onclick="switchCam('storage')">STORAGE</button>
-  <button onclick="switchCam('back')">BACK</button>
-  <button onclick="switchCam('stage')">STAGE</button>
-  <button onclick="toggleDoor()">DOOR</button>
+  <button onclick="lookLeft()">LEFT</button>
+  <button onclick="lookCenter()">CENTER</button>
+  <button onclick="lookRight()">RIGHT</button>
+  <br>
+  <button onclick="toggleDoor('left')">LEFT DOOR</button>
+  <button onclick="lightDoor('left')">LEFT LIGHT</button>
+  <button onclick="toggleDoor('right')">RIGHT DOOR</button>
+  <button onclick="lightDoor('right')">RIGHT LIGHT</button>
+  <br>
+  <button onclick="toggleCam()">📺 CAM</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
 
 <script>
-// BASIC
+// SCENE
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// LIGHT
-const light = new THREE.PointLight(0xffffff,1);
-light.position.set(0,5,5);
-scene.add(light);
+scene.add(new THREE.AmbientLight(0x404040));
 
-// ROOM FUNC
-function makeRoom(x,z,color){
-  const room = new THREE.Mesh(
-    new THREE.BoxGeometry(6,4,6),
-    new THREE.MeshBasicMaterial({color:color, side:THREE.BackSide})
+// MAP
+const camPos = {
+  office:[0,2,3],
+  hall:[10,2,3],
+  vent:[-10,2,3],
+  stage:[0,2,-15]
+};
+
+// ROOM
+function room(x,z){
+  const r=new THREE.Mesh(
+    new THREE.BoxGeometry(8,5,8),
+    new THREE.MeshBasicMaterial({color:0x111111,side:THREE.BackSide})
   );
-  room.position.set(x,2,z);
-  scene.add(room);
+  r.position.set(x,2,z);
+  scene.add(r);
 }
+room(0,0); room(10,0); room(-10,0); room(0,-20);
 
-// ROOMS
-makeRoom(0,0,0x111111);      // office
-makeRoom(10,0,0x222222);     // hall
-makeRoom(-10,0,0x333333);    // vent
-makeRoom(0,-10,0x444444);    // power
-makeRoom(10,-10,0x555555);   // storage
-makeRoom(-10,-10,0x666666);  // back
-makeRoom(0,-20,0x777777);    // stage
-
-// CAMERA
-let camMode = "office";
-
-function switchCam(mode){
-  camMode = mode;
+// DOOR
+function makeDoor(x){
+  const d=new THREE.Mesh(
+    new THREE.BoxGeometry(1,3,0.2),
+    new THREE.MeshBasicMaterial({color:0x550000})
+  );
+  d.position.set(x,1.5,-4);
+  scene.add(d);
+  return d;
 }
+const leftDoor=makeDoor(-3);
+const rightDoor=makeDoor(3);
 
-function updateCam(){
-  if(camMode=="office") camera.position.set(0,2,5);
-  if(camMode=="hall") camera.position.set(10,2,5);
-  if(camMode=="vent") camera.position.set(-10,2,5);
-  if(camMode=="power") camera.position.set(0,2,-5);
-  if(camMode=="storage") camera.position.set(10,2,-5);
-  if(camMode=="back") camera.position.set(-10,2,-5);
-  if(camMode=="stage") camera.position.set(0,2,-15);
+let door={left:false,right:false};
+
+// LIGHT
+function makeLight(x){
+  const l=new THREE.PointLight(0xffffaa,0,5);
+  l.position.set(x,2,-3);
+  scene.add(l);
+  return l;
 }
+const leftLight=makeLight(-3);
+const rightLight=makeLight(3);
 
 // MONSTER
-function createMonster(color){
-  const m = new THREE.Mesh(
+function monster(color){
+  const m=new THREE.Mesh(
     new THREE.BoxGeometry(1,1,1),
     new THREE.MeshBasicMaterial({color})
   );
   scene.add(m);
   return m;
 }
+const watcher=monster(0xffffff);
+const crawler=monster(0xff0000);
 
-const watcher = createMonster(0xffffff);
-const listener = createMonster(0x00ff00);
-const crawler = createMonster(0xff0000);
+// SPAWN
+function resetM(m){ m.position.set(0,0.5,-18); }
+resetM(watcher); resetM(crawler);
 
-// START DI STAGE
-function resetMonster(m){
-  m.position.set(0,0.5,-18);
+// STATE
+let camOpen=false;
+let cam="office";
+let power=100;
+let safe=600;
+let tick=0;
+
+// CAMERA
+function updateCam(){
+  let p=camPos[cam];
+  camera.position.set(p[0],p[1],p[2]);
 }
-resetMonster(watcher);
-resetMonster(listener);
-resetMonster(crawler);
+
+// LOOK
+function lookLeft(){ if(camOpen)return; camera.rotation.y=0.8; }
+function lookCenter(){ if(camOpen)return; camera.rotation.y=0; }
+function lookRight(){ if(camOpen)return; camera.rotation.y=-0.8; }
 
 // DOOR
-let doorClosed = false;
-function toggleDoor(){
-  doorClosed = !doorClosed;
+function toggleDoor(s){
+  door[s]=!door[s];
+  let d=s=="left"?leftDoor:rightDoor;
+  d.position.y=door[s]?0.5:1.5;
 }
 
-// POWER
-let power = 100;
+// LIGHT
+function lightDoor(s){
+  let l=s=="left"?leftLight:rightLight;
+  l.intensity=2;
+  setTimeout(()=>l.intensity=0,800);
+}
 
-// NIGHT
-let night = 1;
+// CAM
+function toggleCam(){
+  camOpen=!camOpen;
+  camUI.style.display=camOpen?"block":"none";
+  cam=camOpen?"hall":"office";
+}
+function viewCam(n){ cam=n; }
+
+// JUMPSCARE
+function jumpscare(){
+  jumpscareDiv.style.display="flex";
+  setTimeout(()=>location.reload(),2000);
+}
 
 // LOOP
-let tick = 0;
-
 function animate(){
-  requestAnimationFrame(animate);
-  tick++;
+requestAnimationFrame(animate);
+tick++;
 
-  updateCam();
+updateCam();
 
-  // POWER SYSTEM
-  power -= doorClosed ? 0.05 : 0.01;
-  power -= camMode !== "office" ? 0.02 : 0;
+// SAFE
+if(safe>0){ safe--; }
 
-  if(power <= 0){
-    alert("POWER OUT 😈");
-    location.reload();
-  }
+// POWER
+power -= door.left||door.right ? 0.02:0.01;
+power -= camOpen ? 0.02:0;
 
-  // WATCHER (gak dilihat = gerak)
-  if(camMode !== "hall" && tick % 60 === 0){
-    watcher.position.z += 0.5;
-  }
+if(power<=0) jumpscare();
 
-  // LISTENER (random teleport)
-  if(tick % 120 === 0){
-    const positions = [
-      [10,0],[-10,0],[0,-10]
-    ];
-    let p = positions[Math.floor(Math.random()*positions.length)];
-    listener.position.set(p[0],0.5,p[1]);
-  }
-
-  // CRAWLER (cepat rush)
-  if(tick % 40 === 0){
-    crawler.position.z += 1;
-  }
-
-  // STAGE RELEASE
-  if(tick % 200 === 0){
-    watcher.position.x = 10;
-    listener.position.x = -10;
-    crawler.position.x = 0;
-  }
-
-  // ATTACK
-  [watcher,listener,crawler].forEach(m=>{
-    if(m.position.z > 4){
-      if(!doorClosed){
-        alert("💀 JUMPSCARE 💀");
-        location.reload();
-      } else {
-        resetMonster(m);
-      }
-    }
-  });
-
-  // NIGHT PROGRESS
-  if(tick % 2000 === 0){
-    night++;
-  }
-
-  info.innerText = "CAM: " + camMode.toUpperCase() + " | NIGHT " + night;
-  powerText.innerText = "POWER: " + Math.floor(power) + "%";
-
-  renderer.render(scene, camera);
+// WATCHER (pelan)
+if(safe<=0 && tick%120===0){
+  watcher.position.z+=2;
 }
 
+// CRAWLER (cepat)
+if(safe<=0 && tick%80===0){
+  crawler.position.z+=3;
+}
+
+// CHECK
+[watcher,crawler].forEach(m=>{
+  if(m.position.z>-2){
+    if(!door.left && !door.right){
+      jumpscare();
+    } else {
+      resetM(m);
+    }
+  }
+});
+
+// UI
+top.innerText = safe>0 ? "GET READY..." : "Night 1";
+powerText.innerText="Power: "+Math.floor(power)+"%";
+
+renderer.render(scene,camera);
+}
 animate();
 </script>
 
